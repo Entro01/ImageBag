@@ -17,18 +17,34 @@ def resize_image(request):
 
         image = Image.open(BytesIO(response.content))
 
-        if width >= height:
-            scale_factor = width / image.width
+        if width and height:
+            if width >= height:
+                scale_factor = width / image.width
+            else:
+                scale_factor = height / image.height
+
+            new_size = (int(image.width * scale_factor), int(image.height * scale_factor))
+            image = image.resize(new_size, Image.LANCZOS)
+
+            x = (image.width - width) // 2
+            y = (image.height - height) // 2
+
+            cropped_image = image.crop((x, y, x + width, y + height))
+
+        elif width:
+            new_width = width
+            new_height = int(image.height * (width / image.width))
+            image = image.resize((new_width, new_height), Image.LANCZOS)
+            cropped_image = image
+
+        elif height:
+            new_height = height
+            new_width = int(image.width * (height / image.height))
+            image = image.resize((new_width, new_height), Image.LANCZOS)
+            cropped_image = image
+
         else:
-            scale_factor = height / image.height
-
-        new_size = (int(image.width * scale_factor), int(image.height * scale_factor))
-        image = image.resize(new_size, Image.LANCZOS)
-
-        x = (image.width - width) // 2
-        y = (image.height - height) // 2
-
-        cropped_image = image.crop((x, y, x + width, y + height))
+            cropped_image = image
 
         output = BytesIO()
         cropped_image.save(output, format="WebP", lossless=True, quality=100)
