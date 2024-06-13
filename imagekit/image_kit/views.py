@@ -7,6 +7,7 @@ def resize_image(request):
     image_url = request.GET.get('url')
     width = int(request.GET.get('w', 0))
     height = int(request.GET.get('h', 0))
+    quality = int(request.GET.get('q', 90))
 
     if not image_url:
         return HttpResponse("Please provide an image URL.", status=400)
@@ -24,7 +25,7 @@ def resize_image(request):
                 scale_factor = height / image.height
 
             new_size = (int(image.width * scale_factor), int(image.height * scale_factor))
-            image = image.resize(new_size, Image.LANCZOS)
+            image = image.resize(new_size, Image.HAMMING)
 
             x = (image.width - width) // 2
             y = (image.height - height) // 2
@@ -34,20 +35,20 @@ def resize_image(request):
         elif width:
             new_width = width
             new_height = int(image.height * (width / image.width))
-            image = image.resize((new_width, new_height), Image.LANCZOS)
+            image = image.resize((new_width, new_height), Image.HAMMING)
             cropped_image = image
 
         elif height:
             new_height = height
             new_width = int(image.width * (height / image.height))
-            image = image.resize((new_width, new_height), Image.LANCZOS)
+            image = image.resize((new_width, new_height), Image.HAMMING)
             cropped_image = image
 
         else:
             cropped_image = image
 
         output = BytesIO()
-        cropped_image.save(output, format="WebP", lossless=True, quality=100)
+        cropped_image.save(output, format="WebP", lossless=False, quality=quality)
         output.seek(0)
 
         return HttpResponse(output.getvalue(), content_type="image/webp")
