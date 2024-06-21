@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-547s4!ag-)5x65gm4i827g=i78v2d36s&6ne@ddc)hs-_0%hss
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['blue-env.eba-2j32raem.ap-south-1.elasticbeanstalk.com', 'prod-env.eba-dak3luo.ap-south-1.elasticbeanstalk.com', '127.0.0.1']
+ALLOWED_HOSTS = ['ImageBag-dev.ap-south-1.elasticbeanstalk.com', 'prod-env.eba-dak3luo.ap-south-1.elasticbeanstalk.com', '127.0.0.1']
 
 # Application definition
 
