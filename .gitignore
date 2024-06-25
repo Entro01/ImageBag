@@ -166,3 +166,32 @@ cython_debug/
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
 A
+
+# compiled output
+**/dist
+**/global-s3-assets
+**/regional-s3-assets
+**/staging
+**/open-source
+**/.zip
+**/tmp
+**/out-tsc
+
+# dependencies
+**/node_modules
+
+# test assets
+**/coverage
+**/coverage-reports
+**/.nyc_output
+**/mock-*
+
+# misc
+**/npm-debug.log
+**/testem.log
+**/.vscode/settings.json
+demo-ui-config.js
+
+# System Files
+**/.DS_Store
+**/.vscode
