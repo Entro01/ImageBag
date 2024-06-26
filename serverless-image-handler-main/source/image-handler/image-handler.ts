@@ -96,6 +96,8 @@ export class ImageHandler {
       let modifiedImage = await this.applyEdits(image, edits, options.animated);
       // modify image output if requested
       modifiedImage = this.modifyImageOutput(modifiedImage, imageRequestInfo);
+      // Strip metadata
+      modifiedImage = modifiedImage.withMetadata(false);
       // convert to base64 encoded string
       const imageBuffer = await modifiedImage.toBuffer();
       base64EncodedImage = imageBuffer.toString("base64");
@@ -103,6 +105,8 @@ export class ImageHandler {
       if (imageRequestInfo.outputFormat !== undefined) {
         // convert image to Sharp and change output format if specified
         const modifiedImage = this.modifyImageOutput(sharp(originalImage, options), imageRequestInfo);
+        // Strip metadata
+        const modifiedImage = modifiedImage.withMetadata(false);
         // convert to base64 encoded string
         const imageBuffer = await modifiedImage.toBuffer();
         base64EncodedImage = imageBuffer.toString("base64");
