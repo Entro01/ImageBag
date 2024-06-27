@@ -8,7 +8,7 @@
     "esModuleInterop": true,
     "experimentalDecorators": true,
     "sourceMap": true,
-    "types": ["node", "jest"]
+    "types": ["node", "@types/jest"]
   },
   "include": ["**/*.ts"],
   "exclude": ["package", "dist", "**/*.map"]

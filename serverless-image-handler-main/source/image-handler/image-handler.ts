@@ -33,16 +33,7 @@ export class ImageHandler {
   // eslint-disable-next-line @typescript-eslint/ban-types
   private async instantiateSharpImage(originalImage: Buffer, edits: ImageEdits, options: Object): Promise<sharp.Sharp> {
     let image: sharp.Sharp = null;
-
-    if (edits.rotate !== undefined && edits.rotate === null) {
-      image = sharp(originalImage, options);
-    } else {
-      const metadata = await sharp(originalImage, options).metadata();
-      image = metadata.orientation
-        ? sharp(originalImage, options).withMetadata({ orientation: metadata.orientation })
-        : sharp(originalImage, options);
-    }
-
+    image = sharp(originalImage, options);
     return image;
   }
 
@@ -346,7 +337,7 @@ export class ImageHandler {
 
       // Need to break out into another sharp pipeline to allow for resize after composite
       const data = await originalImage.composite(overlayOptions).toBuffer();
-      return sharp(data).withMetadata().trim();
+      return sharp(data).trim();
     }
 
     return originalImage;
