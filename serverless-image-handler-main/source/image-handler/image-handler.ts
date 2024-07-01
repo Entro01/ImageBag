@@ -44,19 +44,16 @@ export class ImageHandler {
    * @returns A Sharp image object
    */
   private modifyImageOutput(modifiedImage: sharp.Sharp, imageRequestInfo: ImageRequestInfo): sharp.Sharp {
-    const modifiedOutputImage = modifiedImage;
-
-    // modify if specified
     if (imageRequestInfo.outputFormat !== undefined) {
-      // Include reduction effort for webp images if included
       if (imageRequestInfo.outputFormat === ImageFormatTypes.WEBP && typeof imageRequestInfo.effort !== "undefined") {
-        modifiedOutputImage.webp({ effort: imageRequestInfo.effort });
+        return modifiedImage.webp({ effort: imageRequestInfo.effort });
       } else {
-        modifiedOutputImage.toFormat(ImageHandler.convertImageFormatType(imageRequestInfo.outputFormat));
+        return modifiedImage.toFormat(ImageHandler.convertImageFormatType(imageRequestInfo.outputFormat));
       }
+    } else {
+      // Default to WebP if no output format is specified
+      return modifiedImage.webp({ effort: 4, quality: 80 }); // You can adjust these default values
     }
-
-    return modifiedOutputImage;
   }
 
   /**
@@ -68,13 +65,11 @@ export class ImageHandler {
     const { originalImage, edits } = imageRequestInfo;
     const options = { failOnError: false, animated: imageRequestInfo.contentType === ContentTypes.GIF };
     let base64EncodedImage = "";
-
+  
     // Apply edits if specified
     if (edits && Object.keys(edits).length) {
-      // convert image to Sharp object
       let image = await this.instantiateSharpImage(originalImage, edits, options);
-
-      // default to non animated if image is a GIF without multiple pages
+  
       if (options.animated) {
         const metadata = await image.metadata();
         if (!metadata.pages || metadata.pages <= 1) {
@@ -82,29 +77,18 @@ export class ImageHandler {
           image = await this.instantiateSharpImage(originalImage, edits, options);
         }
       }
-
-      // apply image edits
+  
       let modifiedImage = await this.applyEdits(image, edits, options.animated);
-      // modify image output if requested
       modifiedImage = this.modifyImageOutput(modifiedImage, imageRequestInfo);
-      // convert to base64 encoded string
+  
       const imageBuffer = await modifiedImage.toBuffer();
       base64EncodedImage = imageBuffer.toString("base64");
     } else {
-      if (imageRequestInfo.outputFormat !== undefined) {
-        // convert image to Sharp and change output format if specified
-        const modifiedImage = this.modifyImageOutput(sharp(originalImage, options), imageRequestInfo);
-        // convert to base64 encoded string
-        const imageBuffer = await modifiedImage.toBuffer();
-        base64EncodedImage = imageBuffer.toString("base64");
-      } else {
-        // no edits or output format changes, convert to base64 encoded image
-        base64EncodedImage = originalImage.toString("base64");
-      }
+      const modifiedImage = this.modifyImageOutput(sharp(originalImage, options), imageRequestInfo);
+      const imageBuffer = await modifiedImage.toBuffer();
+      base64EncodedImage = imageBuffer.toString("base64");
     }
-
-    // binary data need to be base64 encoded to pass to the API Gateway proxy https://docs.aws.amazon.com/apigateway/latest/developerguide/lambda-proxy-binary-media.html.
-    // checks whether base64 encoded image fits in 6M limit, see https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html.
+  
     if (base64EncodedImage.length > this.LAMBDA_PAYLOAD_LIMIT) {
       throw new ImageHandlerError(
         StatusCodes.REQUEST_TOO_LONG,
@@ -112,10 +96,9 @@ export class ImageHandler {
         "The converted image is too large to return."
       );
     }
-
+  
     return base64EncodedImage;
   }
-
   /**
    * Applies image modifications to the original image based on edits.
    * @param originalImage The original sharp image.
