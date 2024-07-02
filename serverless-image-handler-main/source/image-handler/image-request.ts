@@ -135,6 +135,9 @@ export class ImageRequest {
       // Fix quality for Thumbor and Custom request type if outputFormat is different from quality type.
       this.fixQuality(imageRequestInfo);
 
+      // Always set the contentType to image/webp
+      imageRequestInfo.contentType = "image/webp";
+
       return imageRequestInfo;
     } catch (error) {
       console.error(error);
