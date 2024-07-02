@@ -36,5 +36,8 @@
   "resolutions": {
     "semver": "7.5.4",
     "word-wrap": "aashutoshrathi/word-wrap"
+  },
+  "dependencies": {
+    "rimraf": "^5.0.7"
   }
 }
