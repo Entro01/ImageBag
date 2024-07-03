@@ -151,7 +151,9 @@ The company was using ImageKit for image resizing, but they sought a new solutio
 
 2. **Metadata Issue**:
    - I identified that the increased file size was due to the extensive metadata attached to the output images by the AWS solution, unlike ImageKit, which stripped the metadata.
+   
    ![File size comparison with additional metadata](./media/with_metadata.jpg)
+
    - **Testing Hypothesis**: I used ExifTool to compare the metadata size of the original image with the resized image, confirming that the metadata significantly increased the file size.
 
    ```sh
@@ -166,12 +168,13 @@ The company was using ImageKit for image resizing, but they sought a new solutio
    Size of EXIF metadata: 5402 bytes
    ```
 
-3. **Customizing the AWS Solution**:
+4. **Customizing the AWS Solution**:
    - I tweaked the `instantiateSharpImage` method, which is called in the `process` method in `image-handler.ts`, to strip metadata from the output images.
    - **Result**: This made the solution's output file sizes comparable to ImageKit.
+   
    ![File size comparison without additional metadata](./media/without_metadata.jpg)
 
-4. **Further Optimization**:
+5. **Further Optimization**:
    - I further improved the load times by changing the default output format to `webp` when no format is specified, modifying the `modifyImageOutput` function in `image-handler.ts`.
    - **Content-Type Header**: The image's metadata would indicate `File:FileTypeWEBP`, but the response header had the original format. I hardcoded the `Content-Type` header to `image/webp` in `image-handler.ts` to ensure consistency, which in hindsight, i realize is not the optimal solution.
 
