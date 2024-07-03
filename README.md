@@ -56,7 +56,7 @@ server {
     server_name imagebag-dev.ap-south-1.elasticbeanstalk.com;
     location / {
         if ($request_uri ~* "^/(.+\.jpg)(.*)$") {
-            rewrite ^/(.+\.jpg)(.*)$ /resize/?url=https://lsmediam2.s3.amazonaws.com/$1$2 break;
+            rewrite ^/(.+\.jpg)(.*)$ /resize/?url=https://<bucket_name>.s3.amazonaws.com/$1$2 break;
         }
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
