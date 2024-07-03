@@ -121,7 +121,7 @@ https://d3lr2v3ps5vtcr.cloudfront.net/100x100/catalog/product/3/2/325103-F11037B
 
 - `https://d3lr2v3ps5vtcr.cloudfront.net` is the CloudFront endpoint provided by CloudFormation.
 - `/100x100/` specifies the required dimensions.
-- `web2.jpg` is the image path in the S3 bucket.
+- `catalog/product/3/2/325103-F11037BLACK_10036_1.jpg` is the image path in the S3 bucket.
 
  To use the testing subdomain, Route 53 needs to be configured to point the subdomain to the the CloudFront distribution.
 
