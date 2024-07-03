@@ -103,7 +103,7 @@ This solution customizes the [AWS Serverless Image Handler](https://github.com/a
 
 Monitor the output for any errors or warnings during the CloudFormation stack deployment.
 
-For detailed deployment instructions, visit the [Serverless Image Handler solution page](https://github.com/aws-solutions/serverless-image-handler).
+For detailed architectural insights into this solution, visit the [Serverless Image Handler solution page](https://aws.amazon.com/solutions/implementations/serverless-image-handler/).
 
 ### Changes Made
 
