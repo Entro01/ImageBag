@@ -128,3 +128,51 @@ https://d3lr2v3ps5vtcr.cloudfront.net/100x100/catalog/product/3/2/325103-F11037B
  ## Why the Customized AWS Solution?
 
 The customized AWS solution leverages Lambda functions and CloudFront as a CDN to provide resized images with significantly reduced load times. This approach addresses scalability and performance issues inherent in traditional server-based image processing. By using serverless architecture, we offload the image resizing task to AWS Lambda, which scales automatically with demand, ensuring high availability and reliability. CloudFront further optimizes the delivery by caching the resized images at edge locations closer to users, resulting in faster load times and a better user experience on the Lulu & Sky website. This combination of technologies ensures efficient, on-the-fly image processing while minimizing server load and operational overhead.
+
+## Process of Replacing the Existing ImageKit Solution
+
+The company was using ImageKit for image resizing, but they sought a new solution that could match or surpass ImageKit in performance, particularly in file size and load times. Here's the process I went through to develop a solution that could replace ImageKit.
+
+### Initial Django API Solution
+
+1. **File Size Issue**:
+   - The initial issue with the Django API was that the file sizes of resized images were larger than those produced by ImageKit at most resolutions.
+   - **Solution**: I resolved this by changing the sampling method in the Pillow library from `LANCZOS` to `HAMMING`, which significantly reduced the file sizes to be comparable with ImageKit's outputs.
+
+2. **Load Time Issue**:
+   - When hosted on Elastic Beanstalk, the load times were unacceptably high.
+   - **Solution**: To address this, I switched to using the AWS solution, which utilizes Lambda functions and CloudFront CDN.
+
+### Customized AWS Solution
+
+1. **Initial Deployment**:
+   - I first deployed the AWS Serverless Image Handler solution without any customization. The combination of Lambda functions and CloudFront CDN greatly reduced the load times compared to the Django API.
+   - However, the file sizes for smaller dimensions were still significantly larger than ImageKit's output.
+
+2. **Metadata Issue**:
+   - I identified that the increased file size was due to the extensive metadata attached to the output images by the AWS solution, unlike ImageKit, which stripped the metadata.
+   ![File size comparison with additional metadata](./media/with_metadata.jpg)
+   - **Testing Hypothesis**: I used ExifTool to compare the metadata size of the original image with the resized image, confirming that the metadata significantly increased the file size.
+
+   ```sh
+   PS > $exifData = & exiftool -s -j "\original.jpg"
+   PS > $size = [System.Text.Encoding]::UTF8.GetByteCount($exifData)
+   PS > Write-Output "Size of EXIF metadata: $size bytes"
+   Size of EXIF metadata: 801 bytes
+
+   PS > $exifData = & exiftool -s -j "\resized.jpg"
+   PS > $size = [System.Text.Encoding]::UTF8.GetByteCount($exifData)
+   PS > Write-Output "Size of EXIF metadata: $size bytes"
+   Size of EXIF metadata: 5402 bytes
+   ```
+
+3. **Customizing the AWS Solution**:
+   - I tweaked the `instantiateSharpImage` method, which is called in the `process` method in `image-handler.ts`, to strip metadata from the output images.
+   - **Result**: This made the solution's output file sizes comparable to ImageKit.
+   ![File size comparison without additional metadata](./media/without_metadata.jpg)
+
+4. **Further Optimization**:
+   - I further improved the load times by changing the default output format to `webp` when no format is specified, modifying the `modifyImageOutput` function in `image-handler.ts`.
+   - **Content-Type Header**: The image's metadata would indicate `File:FileTypeWEBP`, but the response header had the original format. I hardcoded the `Content-Type` header to `image/webp` in `image-handler.ts` to ensure consistency, which in hindsight, i realize is not the optimal solution.
+
+With these modifications, the new solution became comparable to ImageKit in terms of both file size and load times, providing an efficient and scalable alternative for the company's image resizing needs.
