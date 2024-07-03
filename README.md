@@ -154,7 +154,7 @@ The company was using ImageKit for image resizing, but they sought a new solutio
    
    ![File size comparison with additional metadata](./media/with_metadata.jpg)
 
-   - **Testing Hypothesis**: I used ExifTool to compare the metadata size of the original image with the resized image, confirming that the metadata significantly increased the file size.
+   - **Testing Hypothesis**: I used ExifTool to compare the metadata size of the original image with the resized image, confirming that the metadata significantly increased the file size. Note that the dimensions of both the images are exactly the same, i just wanted to test the affect of the resizing function on the image.
 
    ```sh
    PS > $exifData = & exiftool -s -j "\original.jpg"
