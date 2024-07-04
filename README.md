@@ -1,6 +1,6 @@
 # On-the-Fly Image Resizing Tool
 
-The goal of this project was to provide an on-the-fly image resizing tool for the ecommerce website [Lulu & Sky](https://www.luluandsky.com/). The tool needed to support resizing images stored in an S3 bucket and needed to be accessed via a URL format as shown below:
+The goal of this project was to provide an on-the-fly image resizing tool for the ecommerce website [Lulu & Sky](https://www.luluandsky.com/). The tool needed to support resizing images stored in an S3 bucket and needed to be accessible via a URL format as shown below:
 
 ```
 https://imgs7.luluandsky.com/catalog/product/3/2/325103-F11037BLACK_10036_1.jpg&h=352&w=249
@@ -29,6 +29,7 @@ This project offers two solutions:
 
 3. **Apply migrations**
    ```sh
+   cd imagekit
    python manage.py migrate
    ```
 
@@ -85,7 +86,7 @@ This solution customizes the [AWS Serverless Image Handler](https://github.com/a
 
 3. **Bootstrap CDK Environment**
    ```sh
-   cd source/constructs
+   cd serverless-image-handler-main/source/constructs
    npm install rimraf
    npm run clean:install
    $env:overrideWarningsEnabled = "false"; npx cdk bootstrap --profile <PROFILE_NAME>
