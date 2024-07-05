@@ -1,4 +1,4 @@
-# On-the-Fly Image Resizing Tool
+![request](https://github.com/Entro01/ImageBag/assets/63485346/023c9308-dd27-4b3d-a5b8-02ee29124abd)# On-the-Fly Image Resizing Tool
 
 The goal of this project was to provide an on-the-fly image resizing tool for the ecommerce website [Lulu & Sky](https://www.luluandsky.com/). The tool needed to support resizing images stored in an S3 bucket and needed to be accessible via a URL format as shown below:
 
@@ -180,3 +180,61 @@ The company was using ImageKit for image resizing, but they sought a new solutio
    - **Content-Type Header**: The image's metadata would indicate `File:FileTypeWEBP`, but the response header had the original format. I hardcoded the `Content-Type` header to `image/webp` in `image-handler.ts` to ensure consistency, which in hindsight, i realize is not the optimal solution.
 
 With these modifications, the new solution became comparable to ImageKit in terms of both file size and load times, providing an efficient and scalable alternative for the company's image resizing needs.
+
+## Customizing CloudFront Distribution
+
+### Use Case
+
+The company sends GET requests to the CloudFormation output API to retrieve product images from an S3 bucket and resize them on the fly to a select set of dimensions. This is how all the item images are listed on the website.
+
+![Website Product Images](./media/request.jpg)
+
+The following configuration changes are based on my specific use case, but they might vary for other scenarios.
+
+### Configuration Changes
+
+Aside from the default settings, here are the changes I made:
+
+1. **Price Class**:
+   - **Setting**: Price Class All
+   - **Reason**: Includes all CloudFront locations, ensuring global delivery. You can change this according to your userbase. See the regions included in different classes [here](https://aws.amazon.com/cloudfront/pricing/).
+
+2. **Edit Behavior**:
+   - **Compression**: Enabled
+     - **Reason**: Since we're delivering static media content (images), enabling compression helps reduce load times.
+   - **HTTP Methods**: Only allowing GET, HEAD
+     - **Reason**: Our use case is solely retrieving images from the database.
+
+3. **Cache Key and Origin Request**:
+   - **Default Cache Policy Changes**:
+     - **Default TTL**: Increased to one year
+       - **Reason**: The images are rarely modified, so we want them to be stored at the edge cache for as long as possible. While our application doesn’t send request headers regarding caching age, the default TTL will dictate the caching behavior for the edge cache. Alternatively, you can use cache-control headers to instruct CloudFront on how to cache the requested image, within the max/min-TTL defined in the console.
+   - **Cache Key Settings**:
+     - **Removed Accept Header**
+       - **Reason**: This header differs for every browser, and removing it helps achieve a higher cache hit/miss ratio. The fewer headers and query strings included, the shorter the cache key, resulting in a better cache hit/miss ratio due to the reduced likelihood of differing requests. Read more in the [CloudFront documentation](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/understanding-the-cache-key.html).
+     - **Query Strings and Cookie Settings**: Left unchanged as we are not using any query strings in our url call.
+   - **Origin Policy**: Left unchanged as it does not impact load times or caching.
+
+4. **Response Header Policy**:
+   - **Usage**: Not used
+   - **Reason**: Not needed for our use, you can learn more about response headers [here](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/modifying-response-headers.html).
+
+5. **Edit Origin**:
+   - **Origin Shield**: Enabled
+     - **Reason**: Origin Shield acts as an additional caching layer between the regional edge caches and the origin, improving cache availability and hit/miss ratio. Choosing the correct region for your Origin Shield balances cost and performance.
+
+### Origin Shield Flow
+
+**Without Origin Shield**:
+![Request Flow Without Origin Shield](https://docs.aws.amazon.com/images/AmazonCloudFront/latest/DeveloperGuide/images/origin-shield-without.png)
+
+**With Origin Shield**:
+![Request Flow With Origin Shield](https://docs.aws.amazon.com/images/AmazonCloudFront/latest/DeveloperGuide/images/origin-shield-with.png)
+
+**Origin Shield Configuration**:
+- **Region**: ap-south-1 (Mumbai)
+  - **Reason**: Our origin server is located in us-east-1, and our main userbase is in India. Placing the Origin Shield in the same region as the regional edge cache (ap-south-1) ensures improved performance for a small number of requests for the userbase in India and a significant performance increase for nearby regions. Requests from the Mumbai(ap-sout-1) edge cache, which serves the majority of our users, are free when routed through the Origin Shield in the same region as origin shield doesnt charge you for making get requests that naturally go to the regional edge cache in the same region as Origin Shield. However, AWS recommends to choose the AWS Region for your origin shield that has the lowest latency to your origin. See the available regions and AWS recommendations [here](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/origin-shield.html#choose-origin-shield-region).
+
+More information about Origin Shield pricing is available [here](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/origin-shield.html#origin-shield-costs).
+
+These changes ensure that the solution is optimized for performance and cost-effectiveness, meeting the specific needs of the company's image delivery system.
