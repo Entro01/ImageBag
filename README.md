@@ -1,4 +1,4 @@
-![request](https://github.com/Entro01/ImageBag/assets/63485346/023c9308-dd27-4b3d-a5b8-02ee29124abd)# On-the-Fly Image Resizing Tool
+# On-the-Fly Image Resizing Tool
 
 The goal of this project was to provide an on-the-fly image resizing tool for the ecommerce website [Lulu & Sky](https://www.luluandsky.com/). The tool needed to support resizing images stored in an S3 bucket and needed to be accessible via a URL format as shown below:
 
