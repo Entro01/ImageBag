@@ -76,7 +76,7 @@ For more information on configuring your Elastic Beanstalk environment, see the 
 
 ## Customized AWS Solution
 
-This solution customizes the [AWS Serverless Image Handler](https://github.com/aws-solutions/serverless-image-handler) to meet specific requirements.
+This solution customizes the [AWS Serverless Image Handler](https://github.com/aws-solutions/serverless-image-handler) to meet our specific requirements.
 
 ### Setup
 
@@ -94,7 +94,7 @@ This solution customizes the [AWS Serverless Image Handler](https://github.com/a
 
 4. **Deploy the Stack**
    ```sh
-   $env:overrideWarningsEnabled = "false"; npx cdk deploy --parameters DeployDemoUIParameter=No --parameters SourceBucketsParameter=toberesized --profile default
+   $env:overrideWarningsEnabled = "false"; npx cdk deploy --parameters DeployDemoUIParameter=No --parameters SourceBucketsParameter=<MY_BUCKET> --profile <PROFILE_NAME>
    ```
 
    - `MY_BUCKET`: name of an existing bucket in your account.
