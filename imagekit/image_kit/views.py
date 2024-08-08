@@ -9,61 +9,59 @@ def resize_image(request):
     height = int(request.GET.get('h', 0))
     quality = int(request.GET.get('q', 90))
 
-    # checking for an image url
+    # Checking for an image URL
     if not image_url:
         return HttpResponse("Please provide an image URL.", status=400)
 
     try:
-        # downloading image in bytes format
+        # Downloading image in bytes format
         response = requests.get(image_url)
         response.raise_for_status()
 
-        # opening the image with PIL using BytesIO that creates a file like object in memory
+        # Opening the image with PIL using BytesIO that creates a file-like object in memory
         image = Image.open(BytesIO(response.content))
 
-        # determine the original format of the image
+        # Determine the original format of the image
         original_format = image.format
 
-        # determining the scaling factor based on the larger dimension
+        # Calculate the original image's aspect ratio
+        original_width, original_height = image.size
+        original_aspect_ratio = original_width / original_height
+
         if width and height:
-            if width >= height:
-                scale_factor = width / image.width
+            # Calculate the target aspect ratio
+            target_aspect_ratio = width / height
+
+            # Determine crop dimensions to maintain aspect ratio without black bars
+            if original_aspect_ratio > target_aspect_ratio:
+                # Original is wider, crop horizontally
+                new_width = int(original_height * target_aspect_ratio)
+                x = (original_width - new_width) // 2
+                y = 0
+                crop_box = (x, y, x + new_width, original_height)
             else:
-                scale_factor = height / image.height
-            
-            # scaling the image
-            new_size = (int(image.width * scale_factor), int(image.height * scale_factor))
-            image = image.resize(new_size, Image.HAMMING)
+                # Original is taller, crop vertically
+                new_height = int(original_width / target_aspect_ratio)
+                x = 0
+                y = (original_height - new_height) // 2
+                crop_box = (x, y, original_width, y + new_height)
 
-            # calculating the cropping position
-            x = (image.width - width) // 2
-            y = (image.height - height) // 2
+            # Crop the image
+            cropped_image = image.crop(crop_box)
 
-            # cropping image
-            cropped_image = image.crop((x, y, x + width, y + height))
-
-        # if only the width or height dimension is provided, it determines the scaling factor for the other dimension  
-        elif width:
-            new_width = width
-            new_height = int(image.height * (width / image.width))
-            image = image.resize((new_width, new_height), Image.HAMMING)
-            cropped_image = image
-
-        elif height:
-            new_height = height
-            new_width = int(image.width * (height / image.height))
-            image = image.resize((new_width, new_height), Image.HAMMING)
-            cropped_image = image
-
+            # Resize the cropped image to the desired dimensions
+            resized_image = cropped_image.resize((width, height), Image.LANCZOS)
         else:
-            cropped_image = image
+            # No resizing needed
+            resized_image = image
 
-        output = BytesIO()
         # Save the image in the original format
-        cropped_image.save(output, format=original_format, quality=quality)
+        output = BytesIO()
+        resized_image.save(output, format=original_format, quality=quality)
         output.seek(0)
 
-        # return the cropped image data as the response
+        # Return the resized image data as the response
         return HttpResponse(output.getvalue(), content_type=f"image/{original_format.lower()}")
+
     except Exception as e:
         return HttpResponse(f"Error: {str(e)}", status=500)
