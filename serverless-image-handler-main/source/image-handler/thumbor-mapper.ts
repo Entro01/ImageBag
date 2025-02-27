@@ -283,9 +283,15 @@ export class ThumborMapper {
    */
   public mapFilter(filterExpression: string, fileFormat: ImageFormatTypes, previousEdits: ImageEdits = {}): ImageEdits {
     const matched = filterExpression.match(/:(.+)\((.*)\)/); // NOSONAR
-    const [_, filterName, filterValue] = matched;
     const currentEdits = { ...previousEdits };
-
+  
+    // Early return if no match is found
+    if (!matched) {
+      return currentEdits;
+    }
+  
+    const [_, filterName, filterValue] = matched;
+  
     // Find the proper filter
     switch (filterName) {
       case "autojpg": {
@@ -324,10 +330,20 @@ export class ThumborMapper {
         this.mapNoUpscale(currentEdits);
         break;
       }
+      case "position": {
+        // New position case
+        if (!currentEdits.resize) {
+          currentEdits.resize = {};
+        }
+        // Convert position format if needed (e.g., 'right-top' to 'right top')
+        currentEdits.resize.position = filterValue.replace(/-/g, " ");
+        break;
+      }
       case "proportion": {
         this.mapResizeRatio(filterValue, currentEdits);
         break;
       }
+      // ... rest of your cases
       case "quality": {
         this.mapQuality(filterValue, currentEdits, fileFormat);
         break;
@@ -336,7 +352,6 @@ export class ThumborMapper {
         const percentages = filterValue.split(",");
         const values = percentages.map((percentage) => 255 * (Number(percentage) / 100));
         const [r, g, b] = values;
-
         currentEdits.tint = { r, g, b };
         break;
       }
@@ -346,7 +361,6 @@ export class ThumborMapper {
       }
       case "sharpen": {
         const values = filterValue.split(",");
-
         currentEdits.sharpen = 1 + Number(values[1]) / 2;
         break;
       }
@@ -368,10 +382,10 @@ export class ThumborMapper {
         break;
       }
     }
-
+    
     return currentEdits;
   }
-
+  
   /**
    * Maps the image path to crop image edit.
    * @param path an image path.
@@ -411,29 +425,45 @@ export class ThumborMapper {
   private mapResize(path: string): ImageEdits {
     // Process the dimensions
     const dimensionsMatchResult = path.match(/\/((\d+x\d+)|(0x\d+))\//g);
-
+    
+    // Process position parameter (if provided)
+    const positionMatchResult = path.match(/\/position-([\w-]+)\//g);
+    let position = null;
+    
+    if (positionMatchResult) {
+      // Extract position value (remove '/position-' and trailing '/')
+      position = positionMatchResult[0].replace(/\/position-/g, "").replace(/\//g, "");
+      // Convert position format from URL-friendly to Sharp format (e.g., 'right-top' to 'right top')
+      position = position.replace(/-/g, " ");
+    }
+  
     if (dimensionsMatchResult) {
       // Assign dimensions from the first match only to avoid parsing dimension from image file names
       const [width, height] = dimensionsMatchResult[0]
         .replace(/\//g, "")
         .split("x")
         .map((x) => parseInt(x));
-
+  
       // Set only if the dimensions provided are valid
       if (!isNaN(width) && !isNaN(height)) {
         const resizeEdit: ImageEdits = { resize: {} };
-
+  
         // If width or height is 0, fit would be inside.
         if (width === 0 || height === 0) {
           resizeEdit.resize.fit = ImageFitTypes.INSIDE;
         }
         resizeEdit.resize.width = width === 0 ? null : width;
         resizeEdit.resize.height = height === 0 ? null : height;
-
+        
+        // Add position if provided and fit is cover or contain
+        if (position && (resizeEdit.resize.fit === ImageFitTypes.COVER || resizeEdit.resize.fit === undefined)) {
+          resizeEdit.resize.position = position;
+        }
+  
         return resizeEdit;
       }
     }
-
+  
     return ThumborMapper.EMPTY_IMAGE_EDITS;
   }
 

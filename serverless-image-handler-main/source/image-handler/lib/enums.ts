@@ -44,3 +44,16 @@ export enum ContentTypes {
   GIF = "image/gif",
   SVG = "image/svg+xml",
 }
+
+export enum ImagePositionTypes {
+  CENTER = "centre",
+  CENTRE = "centre",
+  TOP = "top",
+  RIGHT_TOP = "right top",
+  RIGHT = "right",
+  RIGHT_BOTTOM = "right bottom",
+  BOTTOM = "bottom",
+  LEFT_BOTTOM = "left bottom",
+  LEFT = "left",
+  LEFT_TOP = "left top"
+}

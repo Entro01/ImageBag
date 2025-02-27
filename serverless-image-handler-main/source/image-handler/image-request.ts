@@ -297,6 +297,7 @@ export class ImageRequest {
         path
           .replace(/\/\d+x\d+:\d+x\d+(?=\/)/g, "")
           .replace(/\/\d+x\d+(?=\/)/g, "")
+          .replace(/\/position-[\w-]+(?=\/)/g, "")
           .replace(/filters:watermark\(.*\)/u, "")
           .replace(/filters:[^/]+/g, "")
           .replace(/\/fit-in(?=\/)/g, "")

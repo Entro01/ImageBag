@@ -47,8 +47,6 @@ export class ImageHandler {
     if (imageRequestInfo.outputFormat !== undefined) {
       if (imageRequestInfo.outputFormat === ImageFormatTypes.WEBP && typeof imageRequestInfo.effort !== "undefined") {
         return modifiedImage.webp({ effort: imageRequestInfo.effort });
-      } else {
-        return modifiedImage.toFormat(ImageHandler.convertImageFormatType(imageRequestInfo.outputFormat));
       }
     } else {
       // Default to WebP if no output format is specified
@@ -111,23 +109,10 @@ export class ImageHandler {
 
     // Apply the image edits
     for (const edit in edits) {
-      if (this.skipEdit(edit, isAnimation)) continue;
 
       switch (edit) {
-        case "overlayWith": {
-          await this.applyOverlayWith(originalImage, edits);
-          break;
-        }
-        case "smartCrop": {
-          await this.applySmartCrop(originalImage, edits);
-          break;
-        }
         case "roundCrop": {
           originalImage = await this.applyRoundCrop(originalImage, edits);
-          break;
-        }
-        case "contentModeration": {
-          await this.applyContentModeration(originalImage, edits);
           break;
         }
         case "crop": {
@@ -157,19 +142,25 @@ export class ImageHandler {
     } else {
       if (edits.resize.width) edits.resize.width = Math.round(Number(edits.resize.width));
       if (edits.resize.height) edits.resize.height = Math.round(Number(edits.resize.height));
-
       if (edits.resize.ratio) {
         const ratio = edits.resize.ratio;
-
         const { width, height } =
           edits.resize.width && edits.resize.height ? edits.resize : await originalImage.metadata();
-
         edits.resize.width = Math.round(width * ratio);
         edits.resize.height = Math.round(height * ratio);
         // Sharp doesn't have such parameter for resize(), we got it from Thumbor mapper.  We don't need to keep this field in the `resize` object
         delete edits.resize.ratio;
-
         if (!edits.resize.fit) edits.resize.fit = ImageFitTypes.INSIDE;
+      }
+      
+      // Validate position parameter - only apply for cover or contain fit types
+      if (edits.resize.position && 
+          (edits.resize.fit === ImageFitTypes.COVER || edits.resize.fit === ImageFitTypes.CONTAIN)) {
+        // Position is already in the correct format for Sharp
+        // Nothing more to do here, Sharp will use the position as provided
+      } else if (edits.resize.fit === ImageFitTypes.COVER || edits.resize.fit === ImageFitTypes.CONTAIN) {
+        // If fit is cover or contain but no position specified, default to center/centre
+        edits.resize.position = 'centre';
       }
     }
   }
@@ -202,72 +193,6 @@ export class ImageHandler {
     return resultSize;
   };
 
-  /**
-   * Applies overlay edit.
-   * @param originalImage The original sharp image.
-   * @param edits The edits to be made to the original image.
-   */
-  private async applyOverlayWith(originalImage: sharp.Sharp, edits: ImageEdits): Promise<void> {
-    let imageMetadata: sharp.Metadata = await originalImage.metadata();
-
-    if (edits.resize) {
-      const imageBuffer = await originalImage.toBuffer();
-      const resizeOptions: ResizeOptions = edits.resize;
-
-      imageMetadata = await sharp(imageBuffer).resize(resizeOptions).metadata();
-    }
-
-    const { bucket, key, wRatio, hRatio, alpha, options } = edits.overlayWith;
-    const overlay = await this.getOverlayImage(bucket, key, wRatio, hRatio, alpha, imageMetadata);
-    const overlayMetadata = await sharp(overlay).metadata();
-    const overlayOption: OverlayOptions = { ...options, input: overlay };
-
-    if (options) {
-      const { left: leftOption, top: topOption } = options;
-
-      const left = this.calcOverlaySizeOption(leftOption, imageMetadata.width, overlayMetadata.width);
-      if (!isNaN(left)) overlayOption.left = left;
-
-      const top = this.calcOverlaySizeOption(topOption, imageMetadata.height, overlayMetadata.height);
-      if (!isNaN(top)) overlayOption.top = top;
-    }
-
-    originalImage.composite([overlayOption]);
-  }
-
-  /**
-   * Applies smart crop edit.
-   * @param originalImage The original sharp image.
-   * @param edits The edits to be made to the original image.
-   */
-  private async applySmartCrop(originalImage: sharp.Sharp, edits: ImageEdits): Promise<void> {
-    // smart crop can be boolean or object
-    if (edits.smartCrop === true || typeof edits.smartCrop === "object") {
-      const { faceIndex, padding } =
-        typeof edits.smartCrop === "object"
-          ? edits.smartCrop
-          : {
-            faceIndex: undefined,
-            padding: undefined,
-          };
-      const { imageBuffer, format } = await this.getRekognitionCompatibleImage(originalImage);
-      const boundingBox = await this.getBoundingBox(imageBuffer.data, faceIndex ?? 0);
-      const cropArea = this.getCropArea(boundingBox, padding ?? 0, imageBuffer.info);
-      try {
-        originalImage.extract(cropArea);
-        // convert image back to previous format
-        if (format !== imageBuffer.info.format) {
-          originalImage.toFormat(format);
-        }
-      } catch (error) {
-        throw new ImageHandlerError(
-          StatusCodes.BAD_REQUEST,
-          "SmartCrop::PaddingOutOfBounds",
-          "The padding value you provided exceeds the boundaries of the original image. Please try choosing a smaller value or applying padding via Sharp for greater specificity."
-        );
-      }
-    }
-  }
 
   /**
    * Determines if the edits specified contain a valid roundCrop item
@@ -356,33 +281,6 @@ export class ImageHandler {
   }
 
   /**
-   *
-   * @param originalImage The original sharp image.
-   * @param edits The edits to be made to the original image.
-   */
-  private async applyContentModeration(originalImage: sharp.Sharp, edits: ImageEdits): Promise<void> {
-    // content moderation can be boolean or object
-    if (edits.contentModeration === true || typeof edits.contentModeration === "object") {
-      const { minConfidence, blur, moderationLabels } =
-        typeof edits.contentModeration === "object"
-          ? edits.contentModeration
-          : {
-            minConfidence: undefined,
-            blur: undefined,
-            moderationLabels: undefined,
-          };
-      const { imageBuffer, format } = await this.getRekognitionCompatibleImage(originalImage);
-      const inappropriateContent = await this.detectInappropriateContent(imageBuffer.data, minConfidence);
-
-      this.blurImage(originalImage, blur, moderationLabels, inappropriateContent);
-      // convert image back to previous format
-      if (format !== imageBuffer.info.format) {
-        originalImage.toFormat(format);
-      }
-    }
-  }
-
-  /**
    * Applies crop edit.
    * @param originalImage The original sharp image.
    * @param edits The edits to be made to the original image.
@@ -399,261 +297,4 @@ export class ImageHandler {
     }
   }
 
-  /**
-   * Checks whether an edit needs to be skipped or not.
-   * @param edit the current edit.
-   * @param isAnimation a flag whether the edit applies to `gif` file or not.
-   * @returns whether the edit needs to be skipped or not.
-   */
-  private skipEdit(edit: string, isAnimation: boolean): boolean {
-    return isAnimation && ["rotate", "smartCrop", "roundCrop", "contentModeration"].includes(edit);
-  }
-
-  /**
-   * Gets an image to be used as an overlay to the primary image from an Amazon S3 bucket.
-   * @param bucket The name of the bucket containing the overlay.
-   * @param key The object keyname corresponding to the overlay.
-   * @param wRatio The width rate of the overlay image.
-   * @param hRatio The height rate of the overlay image.
-   * @param alpha The transparency alpha to the overlay.
-   * @param sourceImageMetadata The metadata of the source image.
-   * @returns An image to be used as an overlay.
-   */
-  public async getOverlayImage(
-    bucket: string,
-    key: string,
-    wRatio: string,
-    hRatio: string,
-    alpha: string,
-    sourceImageMetadata: sharp.Metadata
-  ): Promise<Buffer> {
-    const params = { Bucket: bucket, Key: key };
-    try {
-      const { width, height } = sourceImageMetadata;
-      const overlayImage: S3.GetObjectOutput = await this.s3Client.getObject(params).promise();
-      const resizeOptions: ResizeOptions = {
-        fit: ImageFitTypes.INSIDE,
-      };
-
-      // Set width and height of the watermark image based on the ratio
-      const zeroToHundred = /^(100|[1-9]?\d)$/;
-      if (zeroToHundred.test(wRatio)) {
-        resizeOptions.width = Math.floor((width * parseInt(wRatio)) / 100);
-      }
-      if (zeroToHundred.test(hRatio)) {
-        resizeOptions.height = Math.floor((height * parseInt(hRatio)) / 100);
-      }
-
-      // If alpha is not within 0-100, the default alpha is 0 (fully opaque).
-      const alphaValue = zeroToHundred.test(alpha) ? parseInt(alpha) : 0;
-      const imageBuffer = Buffer.isBuffer(overlayImage.Body)
-        ? overlayImage.Body
-        : Buffer.from(overlayImage.Body as Uint8Array);
-      return await sharp(imageBuffer)
-        .resize(resizeOptions)
-        .composite([
-          {
-            input: Buffer.from([255, 255, 255, 255 * (1 - alphaValue / 100)]),
-            raw: { width: 1, height: 1, channels: 4 },
-            tile: true,
-            blend: "dest-in",
-          },
-        ])
-        .toBuffer();
-    } catch (error) {
-      throw new ImageHandlerError(
-        error.statusCode ? error.statusCode : StatusCodes.INTERNAL_SERVER_ERROR,
-        error.code,
-        error.message
-      );
-    }
-  }
-
-  /**
-   * Calculates the crop area for a smart-cropped image based on the bounding box data returned by Amazon Rekognition, as well as padding options and the image metadata.
-   * @param boundingBox The bounding box of the detected face.
-   * @param padding Set of options for smart cropping.
-   * @param boxSize Sharp image metadata.
-   * @returns Calculated crop area for a smart-cropped image.
-   */
-  public getCropArea(boundingBox: BoundingBox, padding: number, boxSize: BoxSize): BoundingBox {
-    // calculate needed options dimensions
-    let left = Math.floor(boundingBox.left * boxSize.width - padding);
-    let top = Math.floor(boundingBox.top * boxSize.height - padding);
-    let extractWidth = Math.floor(boundingBox.width * boxSize.width + padding * 2);
-    let extractHeight = Math.floor(boundingBox.height * boxSize.height + padding * 2);
-
-    // check if dimensions fit within image dimensions and re-adjust if necessary
-    left = left < 0 ? 0 : left;
-    top = top < 0 ? 0 : top;
-    const maxWidth = boxSize.width - left;
-    const maxHeight = boxSize.height - top;
-    extractWidth = extractWidth > maxWidth ? maxWidth : extractWidth;
-    extractHeight = extractHeight > maxHeight ? maxHeight : extractHeight;
-
-    // Calculate the smart crop area
-    return {
-      left,
-      top,
-      width: extractWidth,
-      height: extractHeight,
-    };
-  }
-
-  /**
-   *
-   * @param response the response from a Rekognition detectFaces API call
-   * @param faceIndex the index number of the face detected
-   * @param boundingBox the box bounds
-   * @param boundingBox.Height height of bounding box
-   * @param boundingBox.Left left side of bounding box
-   * @param boundingBox.Top top of bounding box
-   * @param boundingBox.Width width of bounding box
-   */
-  private handleBounds(
-    response: Rekognition.DetectFacesResponse,
-    faceIndex: number,
-    boundingBox: { Height?: number; Left?: number; Top?: number; Width?: number }
-  ): void {
-    // handle bounds > 1 and < 0
-    for (const bound in response.FaceDetails[faceIndex].BoundingBox) {
-      if (response.FaceDetails[faceIndex].BoundingBox[bound] < 0) boundingBox[bound] = 0;
-      else if (response.FaceDetails[faceIndex].BoundingBox[bound] > 1) boundingBox[bound] = 1;
-      else boundingBox[bound] = response.FaceDetails[faceIndex].BoundingBox[bound];
-    }
-
-    // handle bounds greater than the size of the image
-    if (boundingBox.Left + boundingBox.Width > 1) {
-      boundingBox.Width = 1 - boundingBox.Left;
-    }
-    if (boundingBox.Top + boundingBox.Height > 1) {
-      boundingBox.Height = 1 - boundingBox.Top;
-    }
-  }
-
-  /**
-   * Gets the bounding box of the specified face index within an image, if specified.
-   * @param imageBuffer The original image.
-   * @param faceIndex The zero-based face index value, moving from 0 and up as confidence decreases for detected faces within the image.
-   * @returns The bounding box of the specified face index within an image.
-   */
-  public async getBoundingBox(imageBuffer: Buffer, faceIndex: number): Promise<BoundingBox> {
-    const params = { Image: { Bytes: imageBuffer } };
-
-    try {
-      const response = await this.rekognitionClient.detectFaces(params).promise();
-      if (response.FaceDetails.length <= 0) {
-        return { height: 1, left: 0, top: 0, width: 1 };
-      }
-
-      const boundingBox: { Height?: number; Left?: number; Top?: number; Width?: number } = {};
-
-      this.handleBounds(response, faceIndex, boundingBox);
-
-      return {
-        height: boundingBox.Height,
-        left: boundingBox.Left,
-        top: boundingBox.Top,
-        width: boundingBox.Width,
-      };
-    } catch (error) {
-      console.error(error);
-
-      if (
-        error.message === "Cannot read property 'BoundingBox' of undefined" ||
-        error.message === "Cannot read properties of undefined (reading 'BoundingBox')"
-      ) {
-        throw new ImageHandlerError(
-          StatusCodes.BAD_REQUEST,
-          "SmartCrop::FaceIndexOutOfRange",
-          "You have provided a FaceIndex value that exceeds the length of the zero-based detectedFaces array. Please specify a value that is in-range."
-        );
-      } else {
-        throw new ImageHandlerError(
-          error.statusCode ? error.statusCode : StatusCodes.INTERNAL_SERVER_ERROR,
-          error.code,
-          error.message
-        );
-      }
-    }
-  }
-
-  /**
-   * Detects inappropriate content in an image.
-   * @param imageBuffer The original image.
-   * @param minConfidence The options to pass to the detectModerationLabels Rekognition function.
-   * @returns Detected inappropriate content in an image.
-   */
-  private async detectInappropriateContent(
-    imageBuffer: Buffer,
-    minConfidence: number | undefined
-  ): Promise<Rekognition.DetectModerationLabelsResponse> {
-    try {
-      const params = {
-        Image: { Bytes: imageBuffer },
-        MinConfidence: minConfidence ?? 75,
-      };
-      return await this.rekognitionClient.detectModerationLabels(params).promise();
-    } catch (error) {
-      console.error(error);
-      throw new ImageHandlerError(
-        error.statusCode ? error.statusCode : StatusCodes.INTERNAL_SERVER_ERROR,
-        error.code,
-        error.message
-      );
-    }
-  }
-
-  /**
-   * Converts serverless image handler image format type to 'sharp' format.
-   * @param imageFormatType Result output file type.
-   * @returns Converted 'sharp' format.
-   */
-  private static convertImageFormatType(imageFormatType: ImageFormatTypes): keyof FormatEnum {
-    switch (imageFormatType) {
-      case ImageFormatTypes.JPG:
-        return "jpg";
-      case ImageFormatTypes.JPEG:
-        return "jpeg";
-      case ImageFormatTypes.PNG:
-        return "png";
-      case ImageFormatTypes.WEBP:
-        return "webp";
-      case ImageFormatTypes.TIFF:
-        return "tiff";
-      case ImageFormatTypes.HEIF:
-        return "heif";
-      case ImageFormatTypes.RAW:
-        return "raw";
-      case ImageFormatTypes.GIF:
-        return "gif";
-      default:
-        throw new ImageHandlerError(
-          StatusCodes.INTERNAL_SERVER_ERROR,
-          "UnsupportedOutputImageFormatException",
-          `Format to ${imageFormatType} not supported`
-        );
-    }
-  }
-
-  /**
-   * Converts the image to a rekognition compatible format if current format is not compatible.
-   * @param image the image to be modified by rekognition.
-   * @returns object containing image buffer data and original image format.
-   */
-  private async getRekognitionCompatibleImage(image: sharp.Sharp): Promise<RekognitionCompatibleImage> {
-    const sharp_image = sharp(await image.toBuffer()); // Reload sharp image to ensure current metadata
-    const metadata = await sharp_image.metadata();
-    const format = metadata.format;
-    let imageBuffer: { data: Buffer; info: sharp.OutputInfo };
-
-    // convert image to png if not jpeg or png
-    if (!["jpeg", "png"].includes(format)) {
-      imageBuffer = await image.png().toBuffer({ resolveWithObject: true });
-    } else {
-      imageBuffer = await image.toBuffer({ resolveWithObject: true });
-    }
-
-    return { imageBuffer, format };
-  }
 }
